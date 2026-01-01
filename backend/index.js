@@ -1,7 +1,7 @@
 import express from "express";
 import db from "./db.js";
 import bcrypt from "bcryptjs";
-
+import jwt from "jsonwebtoken";
 const app = express();
 
 // Parse JSON bodies
@@ -44,4 +44,40 @@ app.post("/register", async (req, res) => {
 
 app.listen(5000, () => {
   console.log("Server running on port 5000");
+});
+
+// Secret key for JWT
+const JWT_SECRET = "mysecretkey"; // in real projects, store in .env
+
+// Login API
+app.post("/login", (req, res) => {
+  const { email, password } = req.body;
+
+  if (!email || !password) {
+    return res.status(400).json({ error: "Missing email or password" });
+  }
+
+  // Find user by email
+  const sql = "SELECT * FROM users WHERE email = ?";
+  db.query(sql, [email], async (err, results) => {
+    if (err) return res.status(500).json({ error: err.message });
+    if (results.length === 0) {
+      return res.status(400).json({ error: "User not found" });
+    }
+
+    const user = results[0];
+
+    // Compare password
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+      return res.status(400).json({ error: "Incorrect password" });
+    }
+
+    // Generate JWT
+    const token = jwt.sign({ id: user.id, username: user.username }, JWT_SECRET, {
+      expiresIn: "1h",
+    });
+
+    res.json({ message: "Login successful", token });
+  });
 });
